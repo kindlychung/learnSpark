@@ -4,6 +4,7 @@
   */
 object RDDDemo {
 
+  import org.apache.spark.rdd.RDD
   import Helper.HasRun
   import org.apache.log4j.{Level, Logger}
   import org.apache.spark.sql.{Dataset, SQLContext}
@@ -13,7 +14,8 @@ object RDDDemo {
   val conf = new SparkConf().setAppName("wordCount").setMaster("local[4]")
   val sc = new SparkContext(conf)
 
-  
+
+
   new HasRun {
     override def run: Unit = {
       val email = sc.textFile("/Users/kaiyin/IdeaProjects/learnSpark/src/main/resources/ling-spam/ham/9-463msg1.txt")
@@ -46,6 +48,18 @@ object RDDDemo {
       }, (i1, i2) => i1.max(i2))
       println(partitionLengthsMax)
     }
-  }.newRun("RDD API demo")
+  }.newRun("RDD API ++ and aggregate")
+
+  new HasRun {
+    override def run: Unit = {
+      val nouns = sc.textFile("/Users/kaiyin/IdeaProjects/learnSpark/src/main/resources/nouns")
+      val verbs = sc.textFile("/Users/kaiyin/IdeaProjects/learnSpark/src/main/resources/verbs")
+      val sentences = nouns.cartesian(verbs).take(10)
+      sentences.foreach(println _)
+      println(s"N partitions for nouns: ${nouns.partitions.size}")
+      nouns.coalesce(10, true)
+      println(s"N partitions for nouns after coalesce: ${nouns.partitions.size}")
+    }
+  }.newRun("RDD API ++ and aggregate")
 
 }
