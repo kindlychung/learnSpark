@@ -120,7 +120,7 @@ object RDDDemo {
 //      val words = sc.textFile("/Users/kaiyin/IdeaProjects/learnSpark/src/main/resources/nouns" )
       // count words by starting letter, method 1, slower
       time {
-        words.take(1000000).groupBy((x: String) => x.head).map {
+        words.take(150000).groupBy((x: String) => x.head).map {
           case (c, iter)  => (c, iter.toList.size)
         }.foreach {
           println _
