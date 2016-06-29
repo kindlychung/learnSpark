@@ -4,7 +4,6 @@
       <root url="jar://$USER_HOME$/.ivy2/cache/org.apache.zookeeper/zookeeper/jars/zookeeper-3.4.5.jar!/" />
     </CLASSES>
     <JAVADOC />
-    <LIBRARY_FILE />
     <SOURCES>
       <root url="jar://$USER_HOME$/.ivy2/cache/org.apache.zookeeper/zookeeper/srcs/zookeeper-3.4.5-sources.jar!/" />
     </SOURCES>

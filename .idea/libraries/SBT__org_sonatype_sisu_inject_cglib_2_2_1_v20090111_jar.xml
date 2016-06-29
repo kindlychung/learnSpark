@@ -4,7 +4,6 @@
       <root url="jar://$USER_HOME$/.ivy2/cache/org.sonatype.sisu.inject/cglib/jars/cglib-2.2.1-v20090111.jar!/" />
     </CLASSES>
     <JAVADOC />
-    <LIBRARY_FILE />
     <SOURCES>
       <root url="jar://$USER_HOME$/.ivy2/cache/org.sonatype.sisu.inject/cglib/srcs/cglib-2.2.1-v20090111-sources.jar!/" />
     </SOURCES>

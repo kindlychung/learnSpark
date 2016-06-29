@@ -1,35 +1,58 @@
+import java.io.{StringReader, StringWriter}
 import java.net.URI
+import java.util
+import Helper._
+import org.apache.spark.sql.SQLContext
+import collection.JavaConverters._
+import au.com.bytecode.opencsv.CSVReader
+import scala.collection.mutable
 import scala.language.postfixOps
-
 import org.apache.spark.rdd.RDD
 import org.apache.spark.storage.StorageLevel
-import org.apache.spark.{Partitioner, HashPartitioner, SparkContext, SparkConf}
-
+import org.apache.spark._
+import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.databind.DeserializationFeature
+import com.fasterxml.jackson.module.scala.DefaultScalaModule
+import com.fasterxml.jackson.module.scala.experimental.ScalaObjectMapper
 import scala.util.Try
+import org.apache.log4j.{Logger, Level}
+import com.databricks.spark.csv
+
+import learnSpark._
+import learnSpark.SparkCSVImplicits._
 
 /**
   * Created by kaiyin on 1/31/16.
   */
 object Intro {
 
-  import org.apache.log4j.{Logger, Level}
 
-  Logger.getLogger("org").setLevel(Level.WARN)
-  Logger.getLogger("akka").setLevel(Level.WARN)
+  Logger.getLogger("org").setLevel(Level.ERROR)
+  Logger.getLogger("akka").setLevel(Level.ERROR)
+  val conf = new SparkConf().setAppName("wordCount").setMaster("local[4]")
+  val sc = new SparkContext(conf)
+  val sqlCtx = new SQLContext(sc)
+  import sqlCtx.implicits._
 
   def main(args: Array[String]) {
+
     val inputFile = "/Users/kaiyin/IdeaProjects/learnSpark/src/main/resources/testfile"
     val outputFile = "/Users/kaiyin/IdeaProjects/learnSpark/src/main/resources/testfile.out"
-    val conf = new SparkConf().setAppName("wordCount").setMaster("local[4]")
-    val sc = new SparkContext(conf)
     val input = sc.textFile(inputFile)
-    input.persist(StorageLevel.DISK_ONLY)
+    //    input.persist(StorageLevel.DISK_ONLY)
+    input.persist()
 
 
     def rmRecur(outputFile: String): Try[(Int, Int)] = {
       val outputPath = scalax.file.Path.fromString(outputFile)
       Try(outputPath.deleteRecursively())
     }
+
+    new HasRun {
+      override def run: Unit = {
+        println(input.count())
+      }
+    } run
 
     new HasRun {
       def run: Unit = {
@@ -236,14 +259,14 @@ object Intro {
       def run: Unit = {
         // create a toy examle and check everything is reasonable
         val links = sc.parallelize(List(
-          ("victor", Seq("jane", "lily", "steve")),
-          ("jane", Seq("victor", "lily", "ethan")),
-          ("ethan", Seq("steve", "victor", "amine", "zoe")),
-          ("zoe", Seq("amine", "ethan", "victor")),
-          ("amine", Seq("lily", "zoe", "victor")),
-          ("lily", Seq("victor", "jane")),
-          ("jane", Seq("victor", "lily")),
-          ("steve", Seq("victor", "amine"))
+          ("http://com.victor", Seq("http://com.jane", "http://com.lily", "http://com.steve")),
+          ("http://com.jane", Seq("http://com.victor", "http://com.lily", "http://com.ethan")),
+          ("http://com.ethan", Seq("http://com.steve", "http://com.victor", "http://com.amine", "http://com.zoe")),
+          ("http://com.zoe", Seq("http://com.amine", "http://com.ethan", "http://com.victor")),
+          ("http://com.amine", Seq("http://com.lily", "http://com.zoe", "http://com.victor")),
+          ("http://com.lily", Seq("http://com.victor", "http://com.jane")),
+          ("http://com.jane", Seq("http://com.victor", "http://com.lily")),
+          ("http://com.steve", Seq("http://com.victor", "http://com.amine"))
         )).partitionBy(new DomainNamePartitioner(4)).persist()
         val links1 = links.collect()
         val allUrls = collection.mutable.Set[String]()
@@ -258,7 +281,7 @@ object Intro {
         println(allUrls1)
         // init ranks
         var ranks = links.mapValues(v => 1.0)
-        for(i <- 0 until 10) {
+        for (i <- 0 until 10) {
           // contributions that each url received
           val contributions = links.join(ranks).flatMap {
             case (pageId, (links, rank)) => links.map(dest => (dest, rank / links.size))
@@ -269,5 +292,153 @@ object Intro {
       }
     } run
 
+    new HasRun {
+      def run: Unit = {
+        val dir = "/Users/kaiyin/IdeaProjects/learnSpark/src/main/resources/salesFiles"
+        val input = sc.wholeTextFiles(dir)
+        val result = input.mapValues { y =>
+          val nums = y.split(" ").map(x => x.toDouble)
+          nums.sum / nums.size
+        }.collect()
+        result.foreach(println _)
+      }
+    } run
+
+    new HasRun {
+      override def run: Unit = {
+        println()
+        val input = sc.textFile("/Users/kaiyin/IdeaProjects/learnSpark/src/main/resources/persons.json")
+        val input1 = input.collect()
+        // Parse it into a specific case class. We use mapPartitions beacuse:
+        // (a) ObjectMapper is not serializable so we either create a singleton object encapsulating ObjectMapper
+        //     on the driver and have to send data back to the driver to go through the singleton object.
+        //     Alternatively we can let each node create its own ObjectMapper but that's expensive in a map
+        // (b) To solve for creating an ObjectMapper on each node without being too expensive we create one per
+        //     partition with mapPartitions. Solves serialization and object creation performance hit.
+        val result = input.mapPartitions(records => {
+          val mapper = new ObjectMapper() with ScalaObjectMapper
+          mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+          mapper.registerModule(DefaultScalaModule)
+          records.map(record => {
+            try {
+              Some(mapper.readValue(record, classOf[Person]))
+            } catch {
+              case e: Exception => e
+            }
+          })
+        }, true)
+        result.foreach(println _)
+        // back to string (but only for those for love pandas
+        result.filter {
+          case Some(Person(_, x)) => x
+        } mapPartitions {
+          records => {
+            val mapper = new ObjectMapper() with ScalaObjectMapper
+            mapper.registerModule(DefaultScalaModule)
+            records.map(mapper.writeValueAsString(_))
+          }
+        } foreach (println _)
+      }
+    } newRun
+
+    //    new HasRun {
+    //      override def run: Unit = {
+    //        val input = sc.wholeTextFiles("/Users/kaiyin/IdeaProjects/learnSpark/src/main/resources/mtcars.csv")
+    //        val result = input.flatMap { case (_, txt) => {
+    //          val reader = new CSVReader(new StringReader(txt))
+    //          reader.readAll().asScala.map {
+    //            vals => {
+    //              val valsDouble = vals.map(_.toDouble)
+    //              Car(valsDouble(0), valsDouble(1), valsDouble(2), valsDouble(3), valsDouble(4), valsDouble(5), valsDouble(6), valsDouble(7), valsDouble(8), valsDouble(9), valsDouble(10)
+    //            }
+    //          }
+    //        }
+    //      }
+    //    } newRun
+
+    new HasRun {
+      override def run: Unit = {
+        val input = sc.wholeTextFiles("/Users/kaiyin/IdeaProjects/learnSpark/src/main/resources/mtcars.csv")
+        val result: RDD[Car] = input.flatMap {
+          case (_, txt) => {
+            val reader = new CSVReader(new StringReader(txt))
+            reader.readAll().asScala.tail.map(vals => {
+              val valsDouble = vals.map(_.toDouble)
+              Car(valsDouble(0), valsDouble(1), valsDouble(2), valsDouble(3), valsDouble(4), valsDouble(5), valsDouble(6), valsDouble(7), valsDouble(8), valsDouble(9), valsDouble(10))
+            })
+          }
+        }
+        println(result.collect().toList)
+      }
+    } newRun
+
+    new HasRun {
+      def run: Unit = {
+        val blankLines = sc.accumulator(0)
+        val result = input.flatMap(line => {
+          if(line.trim == "") {
+            blankLines += 1
+            List()
+          } else {
+            line.split(" ").toList
+          }
+        }).persist()
+        val tmpFile = java.io.File.createTempFile("spark_", ".tmp").toString
+        rmRecur(tmpFile)
+        println(tmpFile)
+        result.saveAsTextFile(tmpFile)
+        println(result.collect().toSet)
+        println(blankLines.toString())
+      }
+    } newRun
+
+    new HasRun {
+      override def run: Unit = {
+        val distScript = "/tmp/finddistance.R"
+        val distScriptName = "finddistance.R"
+        sc.addFile(distScript)
+        val distances = sc.parallelize(List(List(1, 2, 3, 4), List(4, 5, 6, 7))).map(x => {
+          x.mkString(",")
+        }).pipe(Seq(SparkFiles.get(distScriptName)))
+        val x = (distances.collect().toList)
+        x.foreach(println _)
+      }
+    } newRun
+
+    new HasRun {
+      override def run: Unit = {
+        val df = sqlCtx.read.json("/Users/kaiyin/IdeaProjects/learnSpark/src/main/resources/persons.json")
+        df.show()
+        df.printSchema()
+        df.select("name").show()
+      }
+    } newRun
+
+    new HasRun {
+      override def run: Unit = {
+        val df = sqlCtx.csv("/Users/kaiyin/IdeaProjects/learnSpark/src/main/resources/mtcars.csv", header = true).load()
+        df.show()
+        df.printSchema()
+        df.select("mpg").show()
+        df.select(df("mpg"), df("vs") + 1).show()
+        df.filter(df("mpg") < 22).show()
+        df.groupBy("vs").count().show()
+      }
+    } newRun
+
+    new HasRun {
+      override def run: Unit = {
+        // convert a seq of scala objects to dataset, will not work in repl
+//        val ds = Seq(Person("victor", true), Person("jane", false)).toDS()
+        Seq(1, 2, 3).toDS().show()
+        Seq((1, "spark"), (2, "hadoop")).toDS().show()
+        sc.parallelize(Seq((1, "spark"), (2, "hadoop"))).toDS().show()
+      }
+    } newRun
+
+
+
+
   }
+
 }

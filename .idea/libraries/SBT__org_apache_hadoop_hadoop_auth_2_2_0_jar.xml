@@ -4,7 +4,6 @@
       <root url="jar://$USER_HOME$/.ivy2/cache/org.apache.hadoop/hadoop-auth/jars/hadoop-auth-2.2.0.jar!/" />
     </CLASSES>
     <JAVADOC />
-    <LIBRARY_FILE />
     <SOURCES>
       <root url="jar://$USER_HOME$/.ivy2/cache/org.apache.hadoop/hadoop-auth/srcs/hadoop-auth-2.2.0-sources.jar!/" />
     </SOURCES>
