@@ -1,0 +1,11 @@
+<component name="libraryTable">
+  <library name="SBT: com.github.eseifert:vectorgraphics2d:0.9.2:jar">
+    <CLASSES>
+      <root url="jar://$USER_HOME$/.ivy2/cache/com.github.eseifert/vectorgraphics2d/jars/vectorgraphics2d-0.9.2.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES>
+      <root url="jar://$USER_HOME$/.ivy2/cache/com.github.eseifert/vectorgraphics2d/srcs/vectorgraphics2d-0.9.2-sources.jar!/" />
+    </SOURCES>
+  </library>
+</component>

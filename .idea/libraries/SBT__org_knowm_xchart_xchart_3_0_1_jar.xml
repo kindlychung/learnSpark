@@ -1,0 +1,11 @@
+<component name="libraryTable">
+  <library name="SBT: org.knowm.xchart:xchart:3.0.1:jar">
+    <CLASSES>
+      <root url="jar://$USER_HOME$/.ivy2/cache/org.knowm.xchart/xchart/jars/xchart-3.0.1.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES>
+      <root url="jar://$USER_HOME$/.ivy2/cache/org.knowm.xchart/xchart/srcs/xchart-3.0.1-sources.jar!/" />
+    </SOURCES>
+  </library>
+</component>
